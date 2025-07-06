@@ -1,6 +1,6 @@
 branches:
   - name: main
-repositoryUrl: https://github.com/rmacedo0/umami-client
+repositoryUrl: https://github.com/rmaced0/umami-client
 plugins:
   - - "@semantic-release/commit-analyzer"
     - preset: "conventionalcommits"
