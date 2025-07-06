@@ -122,9 +122,10 @@ export class Umami {
    *
    * @param {UmamiPayload} [payload] - Optional additional data to send with the page view event.
    * Overrides defaults obtained from the browser.
+   * @param data {UmamiEventData} [data] - Optional additional data to include with the page view event.
    * @return {Promise<Response>} - A promise that resolves to the server response from the tracking event.
    */
-  trackPageView(payload?: UmamiPayload): Promise<Response> {
+  trackPageView(payload?: UmamiPayload, data?: UmamiEventData): Promise<Response> {
     const { websiteId } = this.options;
 
     return this.send(
@@ -137,6 +138,7 @@ export class Umami {
         title: document.title,
         url: window.location.pathname,
         ...payload,
+        ...data,
       },
       EventType.Event,
     );
