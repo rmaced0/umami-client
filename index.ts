@@ -6,12 +6,16 @@ import { version } from './package.json';
  * @property websiteId - The unique identifier for the website being tracked. This is a required property.
  * @property hostUrl - The base URL of the Umami server. Must not end with a `/`. Optional.
  * @property sessionId - A unique identifier for the session. This can be used to track a specific user session. Optional.
+ * @property distinctId - A stable, caller-owned identifier for the visitor (Umami's `distinctId`). When set, it is
+ *   sent as the top-level `id` on every page view and event so Umami attributes them all to the same visitor,
+ *   independent of its server-computed, salt-rotating session. Optional.
  * @property userAgent - The user agent string of the client making the request. Optional.
  */
 export interface UmamiOptions {
   websiteId: string;
   hostUrl: string;
   sessionId?: string;
+  distinctId?: string;
   userAgent?: string;
 }
 
@@ -20,6 +24,7 @@ export interface UmamiOptions {
  */
 interface InternalUmamiPayload extends UmamiPayload {
   website: string;
+  id?: string;
   name?: string;
   data?: UmamiEventData;
 }
@@ -126,11 +131,12 @@ export class Umami {
    * @return {Promise<Response>} - A promise that resolves to the server response from the tracking event.
    */
   trackPageView(payload?: UmamiPayload, data?: UmamiEventData): Promise<Response> {
-    const { websiteId } = this.options;
+    const { websiteId, distinctId } = this.options;
 
     return this.send(
       {
         website: websiteId,
+        id: distinctId,
         hostname: window.location.hostname,
         language: navigator.language,
         referrer: document.referrer,
@@ -153,7 +159,7 @@ export class Umami {
    * @return {Promise<Response>} A promise that resolves to the server response.
    */
   trackEvent(event_name: string, data?: UmamiEventData): Promise<Response> {
-    const { websiteId } = this.options;
+    const { websiteId, distinctId } = this.options;
 
     return this.send({
       hostname: window.location.hostname,
@@ -163,6 +169,7 @@ export class Umami {
       title: document.title,
       url: window.location.pathname,
       website: websiteId,
+      id: distinctId,
       name: event_name,
       data: data,
     });
