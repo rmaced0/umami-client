@@ -27,6 +27,7 @@ let umamiClient = new umami.Umami({
   websiteId: '50429a93-8479-4073-be80-d5d29c09c2ec', // Your website id
   hostUrl: 'https://umami.mywebsite.com' // URL to your Umami instance
   // ,userAgent // (optional) agent specifications ( OS / Browser / Device )
+  // ,distinctId // (optional) stable visitor id, sent as `id` on every page view and event
 });
 
 //~ track a page
@@ -69,3 +70,17 @@ For the `.trackPageView(payload)` function's `payload` argument, the properties 
 For the `.trackEvent(event_name, data)` function, you can add as many properties in `data` as you'd like.
 - **event_name**: Event name
 - **data**: Event data custom properties (values must be a `string`, `number`, or `Date`)
+
+### Identifying the visitor with `distinctId`
+
+By default, Umami derives an anonymous visitor server-side by hashing the request (IP + user agent + a periodically-rotating salt). Set a stable `distinctId` in the client options to attribute every page view and event to a single visitor you control:
+
+```js
+const umamiClient = new umami.Umami({
+  websiteId: '50429a93-8479-4073-be80-d5d29c09c2ec',
+  hostUrl: 'https://umami.mywebsite.com',
+  distinctId: 'a-stable-per-visitor-id', // e.g. a persisted UUID, or your logged-in user id
+});
+```
+
+When set, the client sends `distinctId` as the top-level `id` (Umami's `distinctId`) on every `trackPageView` and `trackEvent` call, so activity stays tied to one visitor regardless of the rotating server session. When omitted, no `id` is sent and Umami falls back to its server-side session.
