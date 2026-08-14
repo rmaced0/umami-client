@@ -141,3 +141,55 @@ describe('Umami with distinctId', () => {
     expect(lastSentPayload().id).toBe('visitor-123');
   });
 });
+
+describe('Umami identify', () => {
+  const options: UmamiOptions = {
+    websiteId: 'test-website',
+    hostUrl: 'https://example.com',
+    sessionId: 'session-abc',
+    distinctId: undefined,
+  };
+
+  beforeEach(() => {
+    umami.reset();
+    umami.init(options);
+    mockFetch();
+  });
+
+  test('sends properties.id as the top-level payload.id', async () => {
+    await umami.identify({ id: 'user-123', plan: 'pro' });
+    expect(lastSentPayload().id).toBe('user-123');
+  });
+
+  test('keeps the id out of the identify data properties', async () => {
+    await umami.identify({ id: 'user-123', plan: 'pro' });
+    expect(lastSentPayload().data).toEqual({ plan: 'pro' });
+  });
+
+  test('persists the identified id so later events share the visitor', async () => {
+    await umami.identify({ id: 'user-123' });
+    await umami.trackEvent('button_press');
+    expect(lastSentPayload().id).toBe('user-123');
+  });
+
+  test('falls back to the configured distinctId when no id is given', async () => {
+    umami.init({ ...options, distinctId: 'visitor-123' });
+
+    await umami.identify({ plan: 'pro' });
+    const payload = lastSentPayload();
+
+    expect(payload.id).toBe('visitor-123');
+    expect(payload.data).toEqual({ plan: 'pro' });
+  });
+
+  test('omits payload.id when no id is given and none is configured', async () => {
+    await umami.identify({ plan: 'pro' });
+    expect(lastSentPayload()).not.toHaveProperty('id');
+  });
+
+  // Umami's /api/send schema has no `session` field, so Zod strips it server-side.
+  test('does not send a client-supplied session', async () => {
+    await umami.identify({ id: 'user-123' });
+    expect(lastSentPayload()).not.toHaveProperty('session');
+  });
+});

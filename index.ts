@@ -5,7 +5,10 @@ import { version } from './package.json';
  *
  * @property websiteId - The unique identifier for the website being tracked. This is a required property.
  * @property hostUrl - The base URL of the Umami server. Must not end with a `/`. Optional.
- * @property sessionId - A unique identifier for the session. This can be used to track a specific user session. Optional.
+ * @property sessionId - A unique identifier for the session. Optional.
+ *   @deprecated Unused. Umami's `/api/send` schema has no `session` field and computes the session
+ *   server-side, so a client-supplied session is stripped from the request and never read. Use
+ *   `distinctId` to attribute activity to a specific visitor.
  * @property distinctId - A stable, caller-owned identifier for the visitor (Umami's `distinctId`). When set, it is
  *   sent as the top-level `id` on every page view and event so Umami attributes them all to the same visitor,
  *   independent of its server-computed, salt-rotating session. Optional.
@@ -33,6 +36,10 @@ interface InternalUmamiPayload extends UmamiPayload {
  * Represents the payload structure used for Umami.
  */
 export interface UmamiPayload {
+  /**
+   * @deprecated Unused. Umami computes the session server-side and strips any client-supplied
+   * `session` from the request. Use the `distinctId` option instead.
+   */
   session?: string;
   hostname?: string;
   language?: string;
@@ -69,6 +76,17 @@ export interface UmamiEventData extends Partial<UmamiRevenueData> {
 export interface UmamiRevenueData {
   revenue: number;
   currency: string;
+}
+
+/**
+ * Represents the user properties passed to `identify`.
+ *
+ * A reserved `id` property sets the visitor's `distinctId` rather than being stored as a user
+ * property, mirroring Umami's own tracker (`umami.identify({ id: 'user-123', plan: 'pro' })`).
+ */
+export interface UmamiIdentifyProperties {
+  id?: string;
+  [key: string]: unknown;
 }
 
 enum EventType {
@@ -176,18 +194,33 @@ export class Umami {
   }
 
   /**
-   * Identifies a user by merging the provided properties with existing properties
-   * and attaches the identifying properties to the sessionID in Umami.
+   * Identifies a visitor by merging the provided properties with existing properties and sending
+   * them to Umami along with the visitor's `distinctId` as the top-level payload `id`.
    *
-   * @param {object} [properties={}] - The user properties to be merged with existing properties and saved to Umami.
+   * Umami links its server-computed session to a known user only when the payload carries that
+   * top-level `id`, so an identify without one saves the properties but establishes no link.
+   *
+   * A reserved `id` property takes precedence and is stored as the instance's `distinctId`, so
+   * subsequent page views and events are attributed to the same visitor. Without it, the
+   * `distinctId` from the options is used.
+   *
+   * @param {UmamiIdentifyProperties} [properties={}] - The user properties to be merged with existing
+   * properties and saved to Umami. A reserved `id` property sets the visitor's `distinctId` instead
+   * of being saved as a user property.
    * @return {Promise<Response>} A promise that resolves to the server response after sending the identification data.
    */
-  identify(properties: object = {}): Promise<Response> {
-    this.properties = { ...this.properties, ...properties };
-    const { sessionId, websiteId } = this.options;
+  identify(properties: UmamiIdentifyProperties = {}): Promise<Response> {
+    const { id, ...userProperties } = properties;
+
+    if (id !== undefined) {
+      this.options.distinctId = id;
+    }
+
+    this.properties = { ...this.properties, ...userProperties };
+    const { websiteId, distinctId } = this.options;
 
     return this.send(
-      { website: websiteId, session: sessionId, data: { ...this.properties } },
+      { website: websiteId, id: distinctId, data: { ...this.properties } },
       EventType.Identify,
     );
   }
